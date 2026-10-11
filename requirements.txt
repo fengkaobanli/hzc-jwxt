@@ -1,0 +1,8 @@
+requests
+beautifulsoup4
+lxml
+ddddocr==1.6.1
+onnxruntime
+Pillow
+numpy
+caldav

@@ -1,0 +1,17 @@
+services:
+  hzc-jwxt:
+    build: .
+    image: hzc-jwxt:latest
+    container_name: hzc-jwxt
+    restart: unless-stopped
+    ports:
+      - "8770:8770"
+    # 去掉 --base-path 则用根路径；对外暴露建议加 --token <口令>
+    command: ["python", "/app/webapp.py", "--host", "0.0.0.0", "--port", "8770", "--base-path", "/class"]
+    volumes:
+      - ./config.json:/app/config.json
+      - ./time_settings.json:/app/time_settings.json
+      - ./cache_courses.json:/app/cache_courses.json
+      - ./qq.json:/app/qq.json
+      - ./sync_config.json:/app/sync_config.json
+      - ./输出:/app/输出
