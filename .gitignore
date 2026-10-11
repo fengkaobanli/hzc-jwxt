@@ -1,0 +1,31 @@
+# 凭据与运行时数据
+config.json
+qq.json
+sync_config.json
+cookies.json
+cache_courses.json
+captcha_failed.jpg
+captcha_*.jpg
+*.log
+
+# 部署 staging（含服务器密码/token，只放服务器）
+deploy_pkg/
+
+# 产物
+*.ics
+dump_*
+
+# 临时调试文件
+_*.html
+_*.json
+
+# 个人会话记录（本地保留，不进仓库）
+对话总结-*.md
+
+# HTML 只保留网页界面本体
+*.html
+!web/index.html
+
+__pycache__/
+.venv/
+.uv/

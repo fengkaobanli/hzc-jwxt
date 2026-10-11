@@ -1,0 +1,14 @@
+.git/
+.venv/
+.uv/
+__pycache__/
+config.json
+qq.json
+sync_config.json
+cache_courses.json
+captcha_failed.jpg
+captcha_*.jpg
+*.log
+输出/
+dump_*
+deploy_pkg/
