@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>课表时间设置 · 惠州城市职业学院</title>
+<style>
+:root{
+  --bg:#0e1116; --panel:#161a21; --panel2:#1c2129; --line:#262d38;
+  --fg:#e7ebf2; --dim:#98a2b3; --dim2:#6b7684;
+  --accent:#4f8cff; --accent2:#3a72dd; --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+  --radius:12px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg);
+  font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  color-scheme:dark;
+}
+a{color:var(--accent)}
+header{
+  position:sticky; top:0; z-index:20;
+  background:rgba(14,17,22,.88); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line); padding:14px 20px;
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+}
+header h1{font-size:16px; margin:0; font-weight:650; letter-spacing:.2px}
+.badge{
+  font-size:12px; padding:3px 9px; border-radius:999px;
+  background:var(--panel2); color:var(--dim); border:1px solid var(--line);
+}
+.badge.live{color:var(--ok); border-color:#1f3a24; background:#12200f}
+.spacer{flex:1}
+main{
+  display:grid; grid-template-columns: minmax(340px, 420px) 1fr;
+  gap:16px; padding:16px 20px 60px; align-items:start;
+}
+main > section{min-width:0}  /* grid 子项默认 min-width:auto 会被宽表格撑开页面 */
+@media (max-width: 980px){ main{grid-template-columns:1fr} }
+.card{
+  background:var(--panel); border:1px solid var(--line);
+  border-radius:var(--radius); padding:14px 16px; margin-bottom:14px;
+}
+.card h2{
+  font-size:13px; margin:0 0 12px; font-weight:650; color:var(--dim);
+  text-transform:uppercase; letter-spacing:.06em;
+}
+label{display:block; font-size:12px; color:var(--dim); margin:0 0 5px}
+input[type=text],input[type=password],input[type=number],input[type=date],input[type=time],select{
+  background:var(--panel2); color:var(--fg); border:1px solid var(--line);
+  border-radius:8px; padding:7px 9px; font:inherit; font-size:13px;
+  width:100%; outline:none;
+}
+input[type=time]{width:auto; min-width:104px; font-variant-numeric:tabular-nums}
+input:focus,select:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(79,140,255,.15)}
+.row{display:flex; gap:8px; align-items:center}
+.row > .grow{flex:1}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.field{margin-bottom:10px}
+button{
+  background:var(--panel2); color:var(--fg); border:1px solid var(--line);
+  border-radius:8px; padding:8px 13px; font:inherit; font-size:13px;
+  cursor:pointer; transition:.12s; white-space:nowrap;
+}
+button:hover{border-color:#3a455b; background:#222833}
+button:disabled{opacity:.45; cursor:not-allowed}
+button.primary{background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600}
+button.primary:hover{background:var(--accent2)}
+button.ghost{background:transparent}
+button.danger{color:var(--bad); border-color:#40222a}
+button.icon{padding:5px 9px; line-height:1; font-size:13px; color:var(--dim)}
+  .weekbar{display:flex; gap:8px; align-items:center; margin:0 0 10px}
+  #weekSel{flex:1; background:#171c26; border:1px solid var(--line); color:var(--fg);
+    border-radius:8px; padding:7px 9px; font-size:13px}
+.seg{display:inline-flex; background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:3px; gap:3px}
+.seg button{border:none; background:transparent; padding:6px 12px; border-radius:6px; color:var(--dim)}
+.seg button.on{background:var(--accent); color:#fff; font-weight:600}
+.tlist{display:flex; flex-direction:column; gap:6px}
+.trow{display:flex; align-items:center; gap:8px}
+.trow .lbl{width:74px; font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums}
+.trow .dash{color:var(--dim2)}
+.new{animation:pulse 1.1s ease-in-out 2}
+@keyframes pulse{50%{background:#20304d}}
+.warn{color:var(--warn); font-size:12px; margin:6px 0 0}
+.hint{color:var(--dim2); font-size:12px; margin:6px 0 0; line-height:1.5}
+.pill{font-size:11px; padding:1px 7px; border-radius:999px; background:var(--panel2); color:var(--dim); border:1px solid var(--line)}
+.pill.ok{color:var(--ok); border-color:#1f3a24}
+.pill.bad{color:var(--bad); border-color:#40222a}
+.pill.run{color:var(--accent); border-color:#243b66}
+
+table.pv{width:100%; border-collapse:separate; border-spacing:0; font-size:12px}
+table.pv th{
+  text-align:center; padding:7px 4px; color:var(--dim); font-weight:600;
+  border-bottom:1px solid var(--line); position:sticky; top:64px; background:var(--panel);
+}
+table.pv td{
+  border-bottom:1px solid var(--line); border-right:1px solid var(--line);
+  padding:0; vertical-align:top; width:1%; min-width:104px;
+}
+table.pv td:last-child{border-right:none}
+table.pv th.time,table.pv td.time{
+  width:92px; min-width:92px; text-align:right; padding:8px 10px 8px 0;
+  color:var(--dim); border-right:1px solid var(--line); white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+.ev{
+  margin:4px; padding:6px 7px; border-radius:7px;
+  background:linear-gradient(180deg,#1e3a5f,#1a2f4d);
+  border:1px solid #2b4f7d; border-left:3px solid var(--accent);
+}
+.ev .n{font-weight:650; color:#dbe8ff; display:block; line-height:1.35}
+.ev .t{color:#8fb6ee; font-variant-numeric:tabular-nums; margin-top:2px}
+.ev .m{color:#7b8ba3; margin-top:1px; font-size:11px}
+.ev.alt{background:linear-gradient(180deg,#1d3a2e,#182f26); border-color:#28583f; border-left-color:#3fb950}
+.ev.alt .t{color:#7fd39a}
+.ev.cont{opacity:.72; border-style:dashed}
+pre.log{
+  background:#0b0e12; border:1px solid var(--line); border-radius:9px;
+  padding:10px; max-height:190px; overflow:auto; font-size:11.5px;
+  color:var(--dim); margin:10px 0 0; white-space:pre-wrap; word-break:break-all;
+}
+.toast{
+  position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(20px);
+  background:#1f2630; border:1px solid var(--line); color:var(--fg);
+  padding:10px 16px; border-radius:10px; font-size:13px; opacity:0;
+  pointer-events:none; transition:.22s; z-index:99; max-width:80vw;
+  box-shadow:0 8px 28px rgba(0,0,0,.45);
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+.toast.bad{border-color:#5a2530; color:#ffb4ab}
+.exp{display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--line)}
+.exp:last-child{border-bottom:none}
+.exp .nm{font-size:12.5px; word-break:break-all; line-height:1.4}
+.exp .sub{color:var(--dim2); font-size:11.5px}
+.empty{color:var(--dim2); font-size:13px; padding:26px 8px; text-align:center; line-height:1.7}
+details summary{cursor:pointer; color:var(--dim); font-size:12px; outline:none}
+details[open] summary{margin-bottom:10px}
+/* ---------- 手机（≤640px） ---------- */
+@media (max-width:640px){
+  body{font-size:15px}
+  header{padding:12px 14px; gap:10px}
+  header h1{font-size:15px}
+  main{padding:12px 12px 48px; gap:12px}
+  .card{padding:12px; margin-bottom:12px}
+  .grid2{grid-template-columns:1fr}
+  button{padding:11px 14px; font-size:14px}
+  #weekSel{min-width:0}
+  .trow{flex-wrap:wrap}
+  /* 预览表：横向滑动，时间列冻结（容器去左右 padding，冻结列吸到边，无缝） */
+  #preview{overflow-x:auto; margin:0 -12px; padding:0 0 8px; -webkit-overflow-scrolling:touch}
+  table.pv{min-width:660px}
+  table.pv th{top:0}
+  table.pv th.time,table.pv td.time{
+    position:sticky; left:0; background:var(--panel); z-index:2;
+    width:70px; min-width:70px; font-size:11px;
+    white-space:normal; line-height:1.5; padding:8px 6px 8px 0;
+    border-left:1px solid var(--line);
+  }
+  /* 周选择器：下拉框独占一行，不顶超 */
+  .weekbar{flex-wrap:wrap}
+  #weekSel{flex:1 1 100%; order:-1; margin-bottom:2px}
+  .grid2 > *{min-width:0}
+  /* 输入行兜底 */
+  .row{flex-wrap:wrap}
+  input,select,button{max-width:100%}
+  .trow input[type=time]{min-width:0; flex:1}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>课表时间设置</h1>
+  <span class="badge" id="semBadge">学期 -</span>
+  <span class="badge" id="fetchBadge">课表未获取</span>
+  <span class="spacer"></span>
+  <span class="badge" id="dirtyBadge" style="display:none">未保存</span>
+</header>
+
+<main>
+  <!--ADMIN-START-->
+  <!-- ============ 左栏 ============ -->
+  <section>
+    <div class="card">
+      <h2>作息模式</h2>
+      <div class="seg" id="modeSeg">
+        <button data-mode="sections">逐节定义</button>
+        <button data-mode="blocks">两节连排</button>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label>套用预设</label>
+        <div class="row">
+          <select id="presetSel" class="grow"></select>
+          <button id="presetBtn">应用</button>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field">
+          <label>课前提醒（分钟）</label>
+          <input type="number" id="remind" min="0" max="240" step="5">
+        </div>
+        <div class="field">
+          <label>第 1 周周一</label>
+          <input type="date" id="startDate">
+        </div>
+      </div>
+      <p class="hint" id="remindHint">设为 0 则不生成课前提醒。</p>
+    </div>
+
+    <div class="card">
+      <h2 id="tlTitle">节次时间</h2>
+      <div class="tlist" id="tlist"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="addRow" class="ghost">+ 添加一节</button>
+        <button id="delRow" class="ghost">− 删掉最后一节</button>
+        <span class="spacer" style="flex:1"></span>
+        <button id="resetBtn" class="danger ghost">恢复默认</button>
+      </div>
+      <div id="warnBox"></div>
+    </div>
+
+    <div class="card">
+      <h2>操作</h2>
+      <div class="row" style="flex-wrap:wrap; gap:8px">
+        <button class="primary" id="saveBtn">保存时间设置</button>
+        <button id="genBtn">生成 ics</button>
+        <button id="fetchBtn">从教务系统获取课表</button>
+      </div>
+      <p class="hint" id="timesPath"></p>
+      <pre class="log" id="log" style="display:none"></pre>
+    </div>
+
+    <details class="card">
+      <summary>账号设置（保存在 config.json，已加入 .gitignore）</summary>
+      <div class="field">
+        <label>账号 / 学号</label>
+        <input type="text" id="cfgUser" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input type="password" id="cfgPass" placeholder="留空则不修改" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label>学期（留空 = 系统当前学期）</label>
+        <input type="text" id="cfgSem" placeholder="2026-2027-1">
+      </div>
+      <button id="cfgBtn">保存账号</button>
+    </details>
+  </section>
+  <!--ADMIN-END-->
+
+  <!-- ============ 右栏 ============ -->
+  <section>
+    <div class="card" id="pvCard">
+      <h2>课表预览 <span class="pill" id="evCount"></span></h2>
+      <div class="weekbar" id="weekBar" style="display:none">
+        <button id="weekPrev" class="icon" title="上一周">‹</button>
+        <select id="weekSel"></select>
+        <button id="weekNext" class="icon" title="下一周">›</button>
+        <button id="weekNow" class="ghost">本周</button>
+      </div>
+      <div class="row" id="guestSyncRow" style="display:none;margin:0 0 10px">
+        <button id="guestFetchBtn" class="primary">从教务系统同步</button>
+        <span class="hint" id="guestFetchHint" style="margin:0"></span>
+      </div>
+      <div class="seg" id="pvModeSeg" style="margin:0 0 10px">
+        <button data-mode="sections">逐节定义</button>
+        <button data-mode="blocks">两节连排</button>
+      </div>
+      <div id="preview"></div>
+    </div>
+    <!--ADMIN-START-->
+    <div class="card" id="remarkCard" style="display:none">
+      <h2>备注栏未排课 <span class="pill" id="rmCount"></span></h2>
+      <div id="remarkList"></div>
+      <p class="hint">这些课在教务系统里只在「备注」行出现，没有固定星期/节次，因此不会生成日程。</p>
+    </div>
+    <div class="card" id="expCard">
+      <h2>导出记录 <span class="pill" id="expCount"></span></h2>
+      <div id="expList"></div>
+      <p class="hint" id="outDir"></p>
+    </div>
+
+    <div class="card" id="qqCard">
+      <h2>同步到邮箱日历 <span class="pill" id="qqState">未同步</span></h2>
+      <label style="display:flex;align-items:center;gap:7px;margin:0 0 10px;cursor:pointer">
+        <input type="checkbox" id="qqAuto" style="width:auto;margin:0"> 自动同步（定时抓取最新课表并推送）
+      </label>
+      <div class="grid2">
+        <div><label>同步间隔</label>
+          <select id="qqInterval">
+            <option value="weekly">每周一 06:30</option>
+            <option value="daily">每天 06:30</option>
+          </select>
+        </div>
+        <div><label>日历名（留空 = 默认名）</label><input type="text" id="qqCalName" placeholder="默认"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;margin:10px 0;cursor:pointer">
+        <input type="checkbox" id="qqWipe" style="width:auto;margin:0" checked> 自动删除旧课表（删掉之前同步的旧日历）
+      </label>
+      <div style="display:flex;gap:8px">
+        <button class="primary" id="qqSyncBtn">一键同步到邮箱日历</button>
+        <button id="qqSave" class="ghost">保存设置</button>
+      </div>
+      <p class="hint" id="qqHint"></p>
+      <pre class="log" id="qqLog" style="display:none"></pre>
+    </div>
+
+    <div class="card" id="arcCard">
+      <h2>服务器归档 <span class="pill" id="arcCount"></span></h2>
+      <label style="display:flex;align-items:center;gap:7px;margin:0 0 10px;cursor:pointer">
+        <input type="checkbox" id="arcOn" style="width:auto;margin:0"> 生成后自动上传到服务器存档
+      </label>
+      <div class="grid2">
+        <div><label>主机</label><input type="text" id="arcHost" placeholder="user@192.168.1.1"></div>
+        <div><label>目录</label><input type="text" id="arcDest" placeholder="/vol1/1000/class"></div>
+      </div>
+      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap">
+        <button id="arcSave">保存归档设置</button>
+        <button id="arcSync">补齐未上传的</button>
+      </div>
+      <div id="arcList"></div>
+      <p class="hint" id="arcHint"></p>
+    </div>
+    <!--ADMIN-END-->
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN = "__TOKEN__";
+const BASE = "__BASE__";
+const GUEST = "__GUEST__" === "1";
+const QS = TOKEN ? ("?token=" + encodeURIComponent(TOKEN)) : "";
+
+const $ = (s) => document.querySelector(s);
+const on = (s, ev, fn) => { const el = document.querySelector(s); if (el) el.addEventListener(ev, fn); };
+const state = { settings:null, presets:{}, presetOrder:[], courses:[], remarks:[],
+                rosterCount:0, rosterWarnings:[], weekMonday:{}, currentWeek:1,
+                week:null,
+                semester:null, dirty:false, fetchState:"idle" };
+
+/* ---------- 基础 ---------- */
+function toast(msg, bad){
+  const t = $("#toast");
+  t.textContent = msg;
+  t.className = "toast show" + (bad ? " bad" : "");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { t.className = "toast"; }, 3200);
+}
+async function api(path, opts){
+  const r = await fetch(BASE + path + QS, opts);
+  const ct = r.headers.get("content-type") || "";
+  const body = ct.includes("json") ? await r.json() : {error: await r.text()};
+  if (!r.ok || body.ok === false) throw new Error(body.error || ("HTTP " + r.status));
+  return body;
+}
+const post = (p, obj) => api(p, {method:"POST", headers:{"Content-Type":"application/json"},
+                                 body: JSON.stringify(obj || {})});
+function setDirty(v){
+  state.dirty = v;
+  $("#dirtyBadge").style.display = v ? "" : "none";
+}
+
+/* ---------- 时间计算（与后端 block_time 同规则） ---------- */
+function toMin(hm){ const [h,m] = hm.split(":"); return (+h)*60 + (+m); }
+function blockTime(sections){
+  const S = state.settings;
+  if (!sections || !sections.length || !S) return null;
+  const a = Math.min(...sections), b = Math.max(...sections);
+  if (S.mode === "blocks"){
+    const B = S.blocks || [];
+    if (!B.length) return null;
+    return [B[Math.min(Math.floor((a-1)/2), B.length-1)][0],
+            B[Math.min(Math.floor((b-1)/2), B.length-1)][1]];
+  }
+  const A = S.sections || [];
+  if (!A.length) return null;
+  return [A[Math.min(a-1, A.length-1)][0], A[Math.min(b-1, A.length-1)][1]];
+}
+function rows(){
+  const S = state.settings;
+  if (!S) return [];
+  if (S.mode === "blocks"){
+    return (S.blocks || []).map((p, i) => ({label:`第${i*2+1}-${i*2+2}节`, pair:p, sections:[i*2+1, i*2+2]}));
+  }
+  return (S.sections || []).map((p, i) => ({label:`第${i+1}节`, pair:p, sections:[i+1]}));
+}
+
+/* ---------- 渲染：节次表 ---------- */
+function renderTlist(flashIdx){
+  const S = state.settings, box = $("#tlist");
+  const list = S.mode === "blocks" ? (S.blocks || []) : (S.sections || []);
+  box.innerHTML = "";
+  $("#tlTitle").textContent = S.mode === "blocks" ? "节次时间（两节连排）" : "节次时间（逐节）";
+  list.forEach((pair, i) => {
+    const div = document.createElement("div");
+    div.className = "trow" + (i === flashIdx ? " new" : "");
+    const lbl = S.mode === "blocks" ? `第${i*2+1}-${i*2+2}节` : `第${i+1}节`;
+    div.innerHTML = `<span class="lbl">${lbl}</span>
+      <input type="time" value="${pair[0]}" data-i="${i}" data-k="0">
+      <span class="dash">→</span>
+      <input type="time" value="${pair[1]}" data-i="${i}" data-k="1">
+      <span class="spacer" style="flex:1"></span>
+      <button class="icon" data-del="${i}" title="删除">✕</button>`;
+    box.appendChild(div);
+  });
+  box.querySelectorAll("input[type=time]").forEach(el => {
+    el.addEventListener("change", () => {
+      const i = +el.dataset.i, k = +el.dataset.k;
+      const arr = state.settings.mode === "blocks" ? state.settings.blocks : state.settings.sections;
+      arr[i][k] = el.value || arr[i][k];
+      setDirty(true); renderAll(false);
+    });
+  });
+  box.querySelectorAll("[data-del]").forEach(el => {
+    el.addEventListener("click", () => {
+      const i = +el.dataset.del;
+      const arr = state.settings.mode === "blocks" ? state.settings.blocks : state.settings.sections;
+      if (arr.length <= 1) return toast("至少保留一节", true);
+      arr.splice(i, 1);
+      setDirty(true); renderAll(false);
+    });
+  });
+}
+
+/* ---------- 渲染：冲突检查 ---------- */
+function localWarnings(){
+  const S = state.settings, w = [];
+  const list = S.mode === "blocks" ? (S.blocks || []) : (S.sections || []);
+  const unit = S.mode === "blocks" ? "块" : "节";
+  list.forEach((p, i) => {
+    if (toMin(p[1]) <= toMin(p[0])) w.push(`第${i+1}${unit} 结束不晚于开始（${p[0]}–${p[1]}）`);
+  });
+  for (let i = 1; i < list.length; i++){
+    if (toMin(list[i][0]) < toMin(list[i-1][1])) w.push(`第${i}${unit}与第${i+1}${unit}时间重叠`);
+  }
+  if (+$("#remind").value > 120) w.push("课前提醒超过 120 分钟，是不是太早了？");
+  return w;
+}
+function renderWarn(serverWarns){
+  const w = (serverWarns && serverWarns.length) ? serverWarns : localWarnings();
+  $("#warnBox").innerHTML = w.map(x => `<p class="warn">⚠ ${x}</p>`).join("");
+}
+
+/* ---------- 按周预览 ---------- */
+function weekKeys(){
+  return Object.keys(state.weekMonday || {}).map(Number).sort((a,b) => a-b);
+}
+function weekRange(w){
+  const s = (state.weekMonday || {})[w];
+  if (!s) return "";
+  const [y, m, d] = String(s).split("-").map(Number);
+  const mon = new Date(y, m - 1, d), sun = new Date(y, m - 1, d + 6);
+  const f = (t) => (t.getMonth() + 1) + "/" + t.getDate();
+  return `${f(mon)}–${f(sun)}`;
+}
+function renderWeekSel(){
+  const bar = $("#weekBar"), sel = $("#weekSel"), ks = weekKeys();
+  if (!ks.length || !state.courses.length){ bar.style.display = "none"; return; }
+  bar.style.display = "";
+  if (state.week == null || !ks.includes(state.week)) state.week = state.currentWeek || ks[0];
+  if (!ks.includes(state.week)) state.week = ks[0];
+  sel.innerHTML = ks.map(w =>
+    `<option value="${w}"${w === state.week ? " selected" : ""}>第 ${w} 周${w === state.currentWeek ? "（本周）" : ""} · ${weekRange(w)}</option>`).join("");
+}
+function stepWeek(d){
+  const ks = weekKeys(); if (!ks.length) return;
+  let i = ks.indexOf(state.week); if (i < 0) i = 0;
+  state.week = ks[Math.min(ks.length - 1, Math.max(0, i + d))];
+  renderWeekSel(); renderPreview();
+}
+
+/* ---------- 渲染：课表预览 ---------- */
+function renderPreview(){
+  const box = $("#preview"), S = state.settings;
+  renderRemarks();
+  if (S.mode === "blocks"){ renderPreviewBlocks(box); return; }
+
+  if (!state.courses.length){
+    box.innerHTML = GUEST
+      ? `<div class="empty">课表数据准备中，请稍后再来。</div>`
+      : `<div class="empty">还没有课表数据。<br>
+      先在下面点「从教务系统获取课表」，<br>就能一边改时间一边看效果了。</div>`;
+    $("#evCount").textContent = "";
+    return;
+  }
+  const list = state.courses.filter(c => (c.weeks || []).includes(state.week));
+  const nd = 7;  // 周一到周日全显示，调课/补课落在周末也能看到
+  if (!list.length){
+    box.innerHTML = `<div class="empty">第 ${state.week} 周没有安排课程。</div>`;
+    $("#evCount").textContent = `第 ${state.week} 周 · ${weekRange(state.week)} · 0 门课` + rosterNote();
+    return;
+  }
+  // 逐节拆行：每节一行，跨多节的课在首节显示完整卡片，后续节显示续排条
+  const maxSec = Math.max(...list.flatMap(c => c.sections));
+
+  let h = `<table class="pv"><thead><tr><th class="time"></th>`;
+  for (let d = 1; d <= nd; d++) h += `<th>${"周一 周二 周三 周四 周五 周六 周日".split(" ")[d-1]}</th>`;
+  h += `</tr></thead><tbody>`;
+  for (let s = 1; s <= maxSec; s++){
+    const tm = blockTime([s]);
+    h += `<tr><td class="time">第${s}节<br><span style="color:#8fb6ee">${tm ? tm[0]+"–"+tm[1] : "—"}</span></td>`;
+    for (let d = 1; d <= nd; d++){
+      const hits = list.filter(c => c.day === d && c.sections.includes(s));
+      if (!hits.length){ h += `<td></td>`; continue; }
+      h += `<td>` + hits.map((c, i) => {
+        const first = Math.min(...c.sections);
+        const t = blockTime([s]);
+        if (s !== first)
+          return `<div class="ev cont"><span class="n">${esc(c.name)}</span><div class="t">续 · ${t ? t[0]+"–"+t[1] : ""}</div></div>`;
+        return `<div class="ev${i % 2 ? " alt" : ""}">
+          <span class="n">${esc(c.name)}</span>
+          <div class="t">${t ? t[0]+"–"+t[1] : ""}</div>
+          <div class="m">${esc(c.teacher || "")}${c.teacher && (c.building||c.classroom) ? " · " : ""}${esc((c.building||"")+(c.classroom||""))}</div>
+        </div>`;
+      }).join("") + `</td>`;
+    }
+    h += `</tr>`;
+  }
+  h += `</tbody></table>`;
+  box.innerHTML = h;
+
+  $("#evCount").textContent = `第 ${state.week} 周 · ${weekRange(state.week)} · ${list.length} 门课`
+    + rosterNote();
+}
+
+function renderPreviewBlocks(box){
+  const S = state.settings;
+  if (!state.courses.length){
+    box.innerHTML = `<div class="empty">还没有课表数据。先点「从教务系统获取课表」。</div>`;
+    $("#evCount").textContent = ""; return;
+  }
+  const list = state.courses.filter(c => (c.weeks || []).includes(state.week));
+  const nd = 7;  // 周一到周日全显示，调课/补课落在周末也能看到
+  const keys = [...new Set(list.map(c => c.sections.join("-")))]
+    .sort((a,b) => (+a.split("-")[0]) - (+b.split("-")[0]));
+  let h = `<table class="pv"><thead><tr><th class="time"></th>`;
+  for (let d = 1; d <= nd; d++) h += `<th>${"周一 周二 周三 周四 周五 周六 周日".split(" ")[d-1]}</th>`;
+  h += `</tr></thead><tbody>`;
+  keys.forEach(key => {
+    const sections = key.split("-").map(Number);
+    const tm = blockTime(sections);
+    h += `<tr><td class="time">第${key}节<br><span style="color:#8fb6ee">${tm ? tm[0]+"–"+tm[1] : "—"}</span></td>`;
+    for (let d = 1; d <= nd; d++){
+      const hits = list.filter(c => c.day === d && c.sections.join("-") === key);
+      h += `<td>` + (hits.length ? hits.map((c,i) => {
+        const t = blockTime(c.sections);
+        return `<div class="ev${i%2?" alt":""}"><span class="n">${esc(c.name)}</span>
+          <div class="t">${t?t[0]+"–"+t[1]:""}</div>
+          <div class="m">${esc(c.teacher||"")}</div></div>`;
+      }).join("") : "") + `</td>`;
+    }
+    h += `</tr>`;
+  });
+  box.innerHTML = h + `</tbody></table>`;
+  $("#evCount").textContent = `第 ${state.week} 周 · ${weekRange(state.week)} · ${list.length} 门课` + rosterNote();
+}
+/* ---------- 渲染：备注栏未排课 + 名单交叉验证 ---------- */
+function rosterNote(){
+  const w = state.rosterWarnings || [];
+  if (w.length) return ` · ⚠ 与名单核对异常 ${w.length} 项`;
+  return state.rosterCount ? ` · 与名单 ${state.rosterCount} 门一致 ✓` : "";
+}
+function renderRemarks(){
+  const list = state.remarks || [];
+  const warns = state.rosterWarnings || [];
+  const card = $("#remarkCard");
+  if (!card) return;  // 访客页无此卡
+  if (!list.length && !warns.length){ card.style.display = "none"; $("#rmCount").textContent = ""; return; }
+  card.style.display = "";
+  $("#rmCount").textContent = (list.length ? list.length + " 门" : "")
+    + (warns.length ? (list.length ? " · " : "") + warns.length + " 项异常" : "");
+  const warnHtml = warns.map(x => `<p class="warn">⚠ ${esc(x)}</p>`).join("");
+  const listHtml = list.map(r => `
+    <div class="exp">
+      <div class="grow" style="flex:1;min-width:0">
+        <div class="nm">${esc(r.name)}</div>
+        <div class="meta">${esc(r.teacher || "—")} · ${esc(r.raw_weeks || "")}</div>
+      </div>
+    </div>`).join("");
+  $("#remarkList").innerHTML = warnHtml + listHtml;
+}
+
+function fmtSize(n){
+  if (n == null) return "";
+  return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+}
+function renderExports(list){
+  const box = $("#expList");
+  if (!list || !list.length){
+    box.innerHTML = `<div class="empty">还没有导出。<br>点上方「生成 ics」，文件会按
+      <span style="color:#8fb6ee">学校_学期_课表_生成时间.ics</span> 命名存进输出目录。</div>`;
+    $("#expCount").textContent = "";
+    return;
+  }
+  $("#expCount").textContent = list.length + " 个";
+  box.innerHTML = list.map((f, i) => `
+    <div class="exp">
+      <div class="grow" style="flex:1; min-width:0">
+        <div class="nm">${esc(f.name)}</div>
+        <div class="sub">${esc(f.semester || "")} · ${fmtSize(f.size)} · ${esc((f.mtime || "").replace("T", " "))}</div>
+      </div>
+      <a href="${BASE}/download/ics${QS ? QS + "&" : "?"}file=${encodeURIComponent(f.name)}">
+        <button class="${i === 0 ? "primary" : ""}">下载</button></a>
+    </div>`).join("");
+}
+async function refreshExports(){
+  try { const s = await api("/api/state"); renderExports(s.exports); } catch(e){}
+}
+
+function renderArchive(items){
+  const box = $("#arcList");
+  if (!items || !items.length){
+    box.innerHTML = `<div class="empty" style="padding:16px 8px">服务器上还没有归档文件。</div>`;
+    $("#arcCount").textContent = "";
+    return;
+  }
+  $("#arcCount").textContent = items.length + " 个";
+  box.innerHTML = `<div style="margin-top:12px">` + items.slice(0, 8).map(f => `
+    <div class="exp">
+      <div style="flex:1; min-width:0">
+        <div class="nm">${esc(f.name)}</div>
+        <div class="sub">${fmtSize(f.size)} · ${esc((f.mtime || "").replace("T", " "))}</div>
+      </div>
+    </div>`).join("") + `</div>`;
+}
+async function loadArchive(){
+  $("#arcList").innerHTML = `<div class="hint">正在读取服务器归档 …</div>`;
+  try {
+    const r = await api("/api/archive");
+    applyArchiveCfg(r.config);
+    renderArchive(r.items);
+    $("#arcHint").textContent = r.config.enabled
+      ? `归档目标：${r.config.host}:${r.config.dest}`
+      : "归档已关闭，生成后只保存在本地 输出/ 目录。";
+  } catch(e){
+    $("#arcList").innerHTML = "";
+    $("#arcHint").textContent = "读取归档失败：" + e.message;
+  }
+}
+function applyArchiveCfg(c){
+  if (!c) return;
+  $("#arcOn").checked = !!c.enabled;
+  $("#arcHost").value = c.host || "";
+  $("#arcDest").value = c.dest || "";
+}
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m])); }
+
+/* ---------- 渲染总入口 ---------- */
+function renderAll(flashIdx){
+  document.querySelectorAll("#modeSeg button, #pvModeSeg button").forEach(b => {
+    b.classList.toggle("on", b.dataset.mode === state.settings.mode);
+  });
+  $("#remind").value = state.settings.remind_minutes;
+  $("#startDate").value = state.settings.semester_start || "";
+  renderTlist(flashIdx);
+  renderWarn();
+  renderWeekSel();
+  renderPreview();
+  $("#timesPath").textContent = "时间设置文件：" + (state.timesFile || "time_settings.json");
+}
+
+/* ---------- QQ 同步 ---------- */
+async function loadQQ(){
+  try {
+    const r = await api("/api/qq-config");
+    const c = r.config || {};
+    $("#qqAuto").checked = !!c.enabled;
+    $("#qqInterval").value = c.interval || "weekly";
+    $("#qqWipe").checked = c.wipe !== false;
+    $("#qqCalName").value = c.cal_name || "";
+    $("#qqCalName").placeholder = "默认：" + (r.defaultCalName || "课表");
+    setQQState(c, r);
+    if (!r.hasQQ) $("#qqHint").textContent = "未检测到 QQ 凭证（qq.json），同步不可用";
+  } catch(e){ /* 忽略，稍后重试 */ }
+}
+function setQQState(c, r){
+  const b = $("#qqState");
+  if (c.last_status === "ok"){
+    b.textContent = `已同步 ${c.last_count || 0} 条 → ${c.last_cal || ""}`;
+    b.className = "pill ok";
+  } else if ((c.last_status || "").indexOf("error") === 0){
+    b.textContent = "上次同步失败"; b.className = "pill bad";
+  } else { b.textContent = "未同步"; b.className = "pill"; }
+  const h = [];
+  if (c.last_run) h.push("上次：" + c.last_run);
+  if (c.enabled && r && r.nextRun)
+    h.push("下次自动：" + r.nextRun + (c.interval === "daily" ? "（每天）" : "（每周）"));
+  else if (!c.enabled) h.push("自动同步已关闭");
+  if (h.length) $("#qqHint").textContent = h.join(" · ");
+}
+on("#qqSave", "click", async () => {
+  try {
+    const r = await post("/api/qq-config", {enabled: $("#qqAuto").checked,
+      interval: $("#qqInterval").value, wipe: $("#qqWipe").checked,
+      cal_name: $("#qqCalName").value});
+    setQQState(r.config, r); toast("同步设置已保存");
+    loadQQ();
+  } catch(e){ toast(e.message, true); }
+});
+on("#qqSyncBtn", "click", async () => {
+  $("#qqLog").style.display = "";
+  $("#qqLog").textContent = "正在同步 ...";
+  $("#qqSyncBtn").disabled = true;
+  try {
+    await post("/api/qq-sync", {});
+    qqPoll();
+  } catch(e){ toast(e.message, true); $("#qqSyncBtn").disabled = false; }
+});
+function qqPushLog(r){
+  const el = $("#qqLog");
+  el.textContent = (r.log || []).join("\n") + (r.error ? "\n" + r.error : "");
+  el.scrollTop = el.scrollHeight;
+}
+async function qqPoll(){
+  try {
+    const r = await api("/api/qq-sync/status");
+    qqPushLog(r);
+    const b = $("#qqState");
+    if (r.state === "running"){ b.textContent = "同步中 ..."; b.className = "pill run"; return void setTimeout(qqPoll, 1500); }
+    $("#qqSyncBtn").disabled = false;
+    if (r.state === "ok"){ toast(`已同步 ${r.result.count} 条 → ${r.result.cal}`); loadQQ(); }
+    else if (r.state === "error"){ toast(r.error || "同步失败", true); loadQQ(); }
+  } catch(e){ $("#qqSyncBtn").disabled = false; toast(e.message, true); }
+}
+
+/* ---------- 访客同步（10 分钟冷却，服务端强制） ---------- */
+on("#guestFetchBtn", "click", async () => {
+  const b = $("#guestFetchBtn");
+  if (b) b.disabled = true;
+  setGuestHint("正在同步 ...");
+  try {
+    await post("/api/guest-fetch", {});
+    guestPoll();
+  } catch(e){ toast(e.message, true); if (b) b.disabled = false; refreshGuestSync(); }
+});
+function setGuestHint(t){
+  const el = $("#guestFetchHint");
+  if (el) el.textContent = t;
+}
+function fmtCooldown(s){
+  if (s <= 0) return "";
+  return s >= 60 ? `约 ${Math.floor(s / 60)} 分钟` : `${s} 秒`;
+}
+async function refreshGuestSync(){
+  try {
+    const g = await api("/api/guest");
+    const cd = g.guestCooldownSec || 0;
+    const b = $("#guestFetchBtn");
+    if (b) b.disabled = cd > 0;
+    setGuestHint(cd > 0 ? `冷却中，${fmtCooldown(cd)}后可再同步（10 分钟一次）`
+                        : "10 分钟可同步一次");
+  } catch(e){}
+}
+async function guestPoll(){
+  try {
+    const r = await api("/api/fetch/status");
+    if (r.state === "running"){ setGuestHint("同步中 ..."); return void setTimeout(guestPoll, 1500); }
+    const b = $("#guestFetchBtn"); if (b) b.disabled = false;
+    if (r.state === "ok"){
+      state.courses = r.courses || []; state.remarks = r.remarks || [];
+      state.rosterCount = r.rosterCount || 0; state.rosterWarnings = r.rosterWarnings || [];
+      state.weekMonday = r.weekMonday || {};
+      state.currentWeek = r.currentWeek || state.currentWeek || 1;
+      state.week = state.currentWeek; state.semester = r.semester;
+      const sb = $("#semBadge"); if (sb) sb.textContent = "学期 " + (r.semester || "待获取");
+      renderWeekSel(); renderPreview(); toast("课表已更新");
+    } else if (r.state === "error"){ toast(r.error || "同步失败", true); }
+    refreshGuestSync();
+  } catch(e){
+    const b = $("#guestFetchBtn"); if (b) b.disabled = false;
+    toast(e.message, true);
+  }
+}
+setInterval(() => { if (GUEST) refreshGuestSync(); }, 30000);
+
+/* ---------- 交互 ---------- */
+on("#weekSel", "change", () => {
+  state.week = +$("#weekSel").value; renderPreview();
+});
+on("#weekPrev", "click", () => stepWeek(-1));
+on("#weekNext", "click", () => stepWeek(1));
+on("#weekNow", "click", () => {
+  state.week = state.currentWeek; renderWeekSel(); renderPreview();
+});
+function setMode(m){
+  if (m === state.settings.mode) return;
+  if (m === "blocks" && !(state.settings.blocks || []).length){
+    state.settings.blocks = [["08:00","09:40"],["10:00","11:40"],["14:00","15:40"],
+                               ["16:00","17:40"],["19:00","20:40"],["20:50","22:30"]];
+  }
+  if (m === "sections" && !(state.settings.sections || []).length){
+    state.settings.sections = [["08:00","08:45"],["08:50","09:35"],["10:00","10:45"],
+                                 ["10:50","11:35"],["14:00","14:45"],["14:50","15:35"]];
+  }
+  state.settings.mode = m;
+  setDirty(true); renderAll();
+}
+document.querySelectorAll("#modeSeg button, #pvModeSeg button").forEach(b => {
+  b.addEventListener("click", () => setMode(b.dataset.mode));
+});
+on("#remind", "change", () => {
+  state.settings.remind_minutes = Math.max(0, +$("#remind").value || 0);
+  setDirty(true); renderWarn(); renderPreview();
+});
+on("#startDate", "change", () => {
+  state.settings.semester_start = $("#startDate").value || null;
+  setDirty(true); renderPreview();
+});
+on("#addRow", "click", () => {
+  const S = state.settings;
+  const arr = S.mode === "blocks" ? (S.blocks = S.blocks || []) : (S.sections = S.sections || []);
+  const last = arr[arr.length-1] || ["08:00","08:45"];
+  const dur = Math.max(30, toMin(last[1]) - toMin(last[0]));
+  const gap = S.mode === "blocks" ? 10 : 5;
+  const start = toMin(last[1]) + gap;
+  const fmt = m => String(Math.floor(m/60)).padStart(2,"0") + ":" + String(m%60).padStart(2,"0");
+  arr.push([fmt(start), fmt(start + dur)]);
+  setDirty(true); renderAll(arr.length - 1);
+});
+on("#delRow", "click", () => {
+  const S = state.settings;
+  const arr = S.mode === "blocks" ? S.blocks : S.sections;
+  if ((arr || []).length <= 1) return toast("至少保留一节", true);
+  arr.pop(); setDirty(true); renderAll();
+});
+on("#presetSel", "change", e => { presetPreview(e.target.value); });
+function presetPreview(name){
+  const p = state.presets[name]; if (!p) return;
+  state.settings.mode = p.mode;
+  if (p.sections) state.settings.sections = p.sections.map(x => x.slice());
+  if (p.blocks) state.settings.blocks = p.blocks.map(x => x.slice());
+  setDirty(true); renderAll();
+}
+on("#presetBtn", "click", () => presetPreview($("#presetSel").value));
+
+on("#resetBtn", "click", async () => {
+  if (state.dirty && !confirm("当前未保存的修改会丢失，继续？")) return;
+  try {
+    const r = await post("/api/reset-times");
+    state.settings = r.settings;
+    await save(true);                       // 直接落盘，避免"看起来恢复了其实没存"
+    renderWarn(r.warnings);
+    toast("已恢复默认作息");
+  } catch(e){ toast(e.message, true); }
+});
+
+on("#saveBtn", "click", () => save(false));
+async function save(silent){
+  try {
+    const r = await post("/api/settings", {settings: state.settings});
+    state.settings = r.settings; setDirty(false); renderAll(); renderWarn(r.warnings);
+    if (!silent) toast("已保存到 " + r.path);
+  } catch(e){ toast("保存失败：" + e.message, true); }
+}
+
+on("#cfgBtn", "click", async () => {
+  try {
+    const r = await post("/api/config", {user: $("#cfgUser").value,
+                                        password: $("#cfgPass").value,
+                                        semester: $("#cfgSem").value});
+    $("#cfgPass").value = "";
+    toast("账号已保存");
+    applyConfig(r.config);
+  } catch(e){ toast(e.message, true); }
+});
+
+on("#fetchBtn", "click", async () => {
+  $("#log").style.display = "";
+  $("#log").textContent = "正在登录教务系统 ...";
+  $("#fetchBtn").disabled = true;
+  fetchT0 = Date.now();
+  try {
+    const r = await post("/api/fetch", {});
+    if (!r.started){ pushLog(r); }
+    poll();
+  } catch(e){ toast(e.message, true); $("#fetchBtn").disabled = false; }
+});
+function pushLog(r){
+  const el = $("#log");
+  el.textContent = (r.log || []).join("\n") + (r.error ? "\n" + r.error : "");
+  el.scrollTop = el.scrollHeight;
+}
+let fetchT0 = 0;
+async function poll(){
+  try {
+    const r = await api("/api/fetch/status");
+    pushLog(r);
+    setFetchBadge(r);
+    if (r.state === "running") return void setTimeout(poll, 1200);
+    $("#fetchBtn").disabled = false;
+    if (r.state === "ok"){ state.courses = r.courses || []; state.remarks = r.remarks || [];
+      state.rosterCount = r.rosterCount || 0; state.rosterWarnings = r.rosterWarnings || [];
+      state.weekMonday = r.weekMonday || {};
+      state.currentWeek = r.currentWeek || state.currentWeek || 1;
+      state.week = state.currentWeek;
+      state.semester = r.semester; renderAll(); toast("课表已更新"); }
+    else if (r.state === "error"){ toast(r.error || "获取失败", true); }
+  } catch(e){ $("#fetchBtn").disabled = false; toast(e.message, true); }
+}
+function setFetchBadge(r){
+  const b = $("#fetchBadge");
+  if (r.state === "running"){
+    const s = fetchT0 ? Math.round((Date.now() - fetchT0) / 1000) : 0;
+    b.textContent = s > 2 ? `获取中 ... ${s} 秒` : "获取中 ...";
+    b.className = "badge live";
+  }
+  else if (r.state === "ok"){ b.textContent = "课表已就绪"; b.className = "badge live"; }
+  else if (r.state === "error"){ b.textContent = "获取失败"; b.className = "badge"; }
+  else { b.textContent = "课表未获取"; b.className = "badge"; }
+}
+on("#arcSave", "click", async () => {
+  try {
+    const r = await post("/api/config", {
+      user: $("#cfgUser").value, password: "",
+      semester: $("#cfgSem").value,
+      archive: {enabled: $("#arcOn").checked,
+                host: $("#arcHost").value, dest: $("#arcDest").value}
+    });
+    applyArchiveCfg(r.archiveConfig);
+    toast("归档设置已保存");
+    loadArchive();
+  } catch(e){ toast(e.message, true); }
+});
+
+on("#arcSync", "click", async () => {
+  $("#arcList").innerHTML = `<div class="hint">正在比对并上传 …</div>`;
+  try {
+    const r = await post("/api/archive", {});
+    renderArchive(r.items);
+    toast(r.message, !r.ok);
+  } catch(e){ toast(e.message, true); loadArchive(); }
+});
+
+on("#genBtn", "click", async () => {
+  try {
+    const r = await post("/api/generate", {});
+    await refreshExports();
+    const a = r.archive || {};
+    let msg = `已生成 ${r.count} 个日程`;
+    if (a.attempted) msg += a.ok ? " · 已归档到服务器" : " · 服务器归档失败";
+    toast(msg, a.attempted && !a.ok);
+    if (a.attempted && !a.ok) $("#arcHint").textContent = a.message || "";
+    loadArchive();
+  } catch(e){ toast(e.message, true); }
+});
+function applyConfig(c){
+  $("#cfgUser").value = c.user || "";
+  $("#cfgSem").value = c.semester || "";
+  $("#cfgPass").placeholder = c.has_password ? "已保存（留空不修改）" : "未设置";
+}
+
+/* ---------- 访客页：只留课表预览 ---------- */
+async function bootGuest(){
+  try {
+    // 访客单栏：左栏已剥离，grid 改单轨，否则预览被挤进窄列
+    const mn = document.querySelector("main");
+    if (mn) mn.style.gridTemplateColumns = "1fr";
+    // 只藏含账号框的左栏 + 按 id 藏管理卡（不按位置，服务端剥离后位置会变）
+    const l = document.querySelector("main > section:first-of-type");
+    if (l && l.querySelector("#cfgBtn")) l.style.display = "none";
+    for (const id of ["remarkCard", "expCard", "arcCard", "qqCard"]){
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    }
+    const fb = $("#fetchBadge"); if (fb) fb.style.display = "none";
+    const pm = $("#pvModeSeg"); if (pm) pm.style.display = "none";
+    const gr = $("#guestSyncRow"); if (gr) gr.style.display = "";
+    const g = await api("/api/guest");
+    state.settings = g.settings;
+    state.courses = g.courses || [];
+    state.rosterCount = g.rosterCount || 0;
+    state.rosterWarnings = g.rosterWarnings || [];
+    state.weekMonday = g.weekMonday || {};
+    state.currentWeek = g.currentWeek || 1;
+    state.week = state.currentWeek;
+    state.semester = g.semester;
+    $("#semBadge").textContent = "学期 " + (g.semester || "待获取");
+    renderWeekSel(); renderPreview();
+    refreshGuestSync();
+    api("/api/fetch/status").then(r => { if (r.state === "running") guestPoll(); }).catch(() => {});
+  } catch(e){
+    $("#preview").innerHTML = `<div class="empty">课表数据准备中，请稍后再来。</div>`;
+  }
+}
+
+/* ---------- 启动 ---------- */
+(async function boot(){
+  if (GUEST) return void bootGuest();
+  try {
+    const s = await api("/api/state");
+    state.settings = s.settings;
+    state.presets = s.presets; state.presetOrder = s.presetOrder;
+    state.courses = s.courses || []; state.remarks = s.remarks || [];
+    state.rosterCount = s.rosterCount || 0; state.rosterWarnings = s.rosterWarnings || [];
+    state.weekMonday = s.weekMonday || {};
+    state.currentWeek = s.currentWeek || 1;
+    if (state.week == null) state.week = state.currentWeek;
+    state.semester = s.semester; state.timesFile = s.timesFile;
+    state.fetchState = s.fetch.state;
+
+    $("#presetSel").innerHTML = (s.presetOrder || []).map(k =>
+      `<option value="${k}">${s.presets[k].label}</option>`).join("");
+    $("#semBadge").textContent = "学期 " + (s.semester || "待获取");
+    setFetchBadge(s.fetch);
+    applyConfig(s.config);
+    applyArchiveCfg(s.archiveConfig);
+    renderExports(s.exports);
+    $("#outDir").textContent = "输出目录：" + (s.outDir || "输出");
+    renderAll(); renderWarn(s.warnings);
+    loadArchive(); loadQQ();
+    if (s.fetch.state === "running"){ $("#log").style.display=""; poll(); }
+  } catch(e){ toast("初始化失败：" + e.message, true); }
+})();
+
+window.addEventListener("beforeunload", e => {
+  if (state.dirty){ e.preventDefault(); e.returnValue = ""; }
+});
+</script>
+</body>
+</html>
