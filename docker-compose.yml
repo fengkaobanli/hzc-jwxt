@@ -14,4 +14,5 @@ services:
       - ./cache_courses.json:/app/cache_courses.json
       - ./qq.json:/app/qq.json
       - ./sync_config.json:/app/sync_config.json
+      - ./sync.log:/app/sync.log
       - ./输出:/app/输出

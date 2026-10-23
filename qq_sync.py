@@ -44,12 +44,18 @@ def _calendars(principal):
     return cals
 
 
-def delete_old_calendars(principal, keep_name, prefix="课表", log=None):
-    """删除所有以 prefix 开头、但不是本次目标的旧课表日历。返回删除数。"""
+_OUR_CAL_RE = re.compile(r'^课表(\s+\d{1,2}月\d{1,2}日\s+\d{1,2}:\d{2})?$')
+
+
+def delete_old_calendars(principal, keep_name, log=None):
+    """删除旧课表日历（只认「课表」或「课表 10月23日 15:39」这种本工具生成的命名）。
+
+    必须在**新日历写入成功之后**调用，避免失败时把用户唯一能看的日历删掉。
+    """
     log = log or (lambda *a: None)
     n = 0
     for nm, c in _calendars(principal).items():
-        if nm != keep_name and str(nm).startswith(prefix):
+        if nm != keep_name and _OUR_CAL_RE.match(str(nm)):
             try:
                 c.delete()
                 n += 1
@@ -59,23 +65,31 @@ def delete_old_calendars(principal, keep_name, prefix="课表", log=None):
     return n
 
 
+def _uid_of(event):
+    m = re.search(r'^UID:(.+)$', event.data.replace('\r\n', '\n'), re.M)
+    return m.group(1).strip() if m else None
+
+
 def sync_ics(ics_path, server, username, password, cal_name,
              wipe=True, limit=0, log=None):
-    """全量同步：备好日历 -> 可选清旧表/旧事件 -> 写入。返回 (写入数, 日历名)。"""
+    """全量同步，**先写后删**：新日历写成功并校验通过后，才删除旧日历。
+
+    任何一步失败都不会动旧日历，避免"同步失败 -> 日历全空"。
+    返回 (写入数, 日历名)。
+    """
     import caldav
     log = log or (lambda *a: None)
     client = caldav.DAVClient(url=server, username=username, password=password)
     principal = client.principal()
     cals = _calendars(principal)
-    if cal_name in cals:
-        cal = cals[cal_name]
-        log(f"日历「{cal_name}」已存在")
-    else:
+    created = cal_name not in cals
+    if created:
         cal = principal.make_calendar(name=cal_name)
         log(f"已新建日历「{cal_name}」")
+    else:
+        cal = cals[cal_name]
+        log(f"日历「{cal_name}」已存在")
 
-    if wipe:
-        delete_old_calendars(principal, cal_name, log=log)
     # QQ 新建日历有短暂生效延迟：就绪前读写会 404，轮询等待
     import time as _time
     ready = False
@@ -91,27 +105,57 @@ def sync_ics(ics_path, server, username, password, cal_name,
             log(f"日历生效中，等待 10 秒 ...({i+1}/6)")
             _time.sleep(10)
     if not ready:
-        raise RuntimeError("QQ 日历长时间未就绪，稍后重试")
-
-    if wipe:
-        existing = cal.events()
-        log(f"清空 {len(existing)} 条旧事件 ...")
-        for e in existing:
+        if created:
             try:
-                e.delete()
-            except Exception as ex:  # noqa: BLE001
-                log(f"  删除失败: {ex}")
+                cal.delete()
+            except Exception:  # noqa: BLE001
+                pass
+        raise RuntimeError("QQ 日历长时间未就绪，旧日历已保留，稍后重试")
 
+    # 先写入（不删任何东西）；失败则回滚本次新建的日历
     events = split_ics(ics_path)
     if limit:
         events = events[:limit]
+    new_uids = {uid for uid, _ in events}
     ok = 0
-    for uid, ical in events:
-        cal.save_event(ical)
-        ok += 1
-    log(f"✅ 写入 {ok} 条事件")
+    try:
+        for uid, ical in events:
+            cal.save_event(ical)
+            ok += 1
+    except Exception as e:  # noqa: BLE001
+        log(f"写入中断（已写 {ok}/{len(events)}）")
+        if created:
+            try:
+                cal.delete()
+                log("已回滚本次新建的不完整日历，旧日历保持不动")
+            except Exception:  # noqa: BLE001
+                pass
+        raise RuntimeError(f"写入失败，旧日历已保留：{e}") from e
+
     back = cal.events()
     log(f"回查日历中共 {len(back)} 条")
+
+    # 同名复用时清掉上一版遗留的多余事件（UID 不在本次集合里）。
+    # 新建日历一定为空，不需要清理；QQ 会把 UID 里的 @ 编码成 %40，
+    # 比较前必须解码，否则会把刚写入的事件误判为"遗留"全删掉。
+    if wipe and not limit and not created:
+        from urllib.parse import unquote
+        stale = 0
+        for ev in back:
+            uid = _uid_of(ev)
+            if uid and unquote(uid) not in {unquote(u) for u in new_uids}:
+                try:
+                    ev.delete()
+                    stale += 1
+                except Exception:  # noqa: BLE001
+                    pass
+        if stale:
+            log(f"清理上一版遗留事件 {stale} 条")
+
+    # 写入成功后才删除旧日历
+    if wipe:
+        delete_old_calendars(principal, cal_name, log=log)
+
     return ok, cal_name
 
 

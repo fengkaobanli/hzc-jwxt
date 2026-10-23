@@ -176,17 +176,23 @@ class App:
         return {}
 
     def default_cal_name(self, fetched_at=None):
-        """默认同步名：课表 + 抓取时间（月日时分），如「课表 10月11日 15:31」"""
-        try:
-            import datetime as _dt
-            t = _dt.datetime.fromisoformat(str(fetched_at or "")[:19])
-            return f"课表 {t.month}月{t.day}日 {t.hour:02d}:{t.minute:02d}"
-        except Exception:  # noqa: BLE001
-            return "课表"
+        """默认日历名固定为「课表」：客户端只勾选一次，之后原地更新。
+
+        早期版本用「课表 10月23日 15:39」这种带时间的名字，每次同步都会
+        产生新日历，客户端不会自动勾选，表现为"同步后什么都看不到"。
+        """
+        return "课表"
 
     def _slog(self, msg):
+        line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {msg}"
         with self.lock:
             self.sync_log.append(str(msg))
+        # 同步日志落盘，便于事后排查（内存日志随重启丢失）
+        try:
+            with open(_p("sync.log"), "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except Exception:  # noqa: BLE001
+            pass
 
     def _next_run_ts(self, interval):
         import datetime as _dt
@@ -256,6 +262,7 @@ class App:
             cfg["last_status"] = "ok"
             cfg["last_count"] = n
             cfg["last_cal"] = used
+            cfg["retry_count"] = 0
             self.write_sync_config(cfg)
         except Exception as e:  # noqa: BLE001
             with self.lock:
@@ -266,6 +273,15 @@ class App:
                 cfg = self.read_sync_config()
                 cfg["last_run"] = time.strftime("%Y-%m-%d %H:%M:%S")
                 cfg["last_status"] = f"error: {e}"
+                # 失败重试：30 分钟后重试，最多 3 次；用尽则回到正常周期
+                rc = int(cfg.get("retry_count") or 0)
+                if auto and rc < 3:
+                    cfg["retry_count"] = rc + 1
+                    cfg["next_run"] = int(time.time()) + 30 * 60
+                    self._slog(f"↻ {30} 分钟后自动重试（第 {rc + 1}/3 次）")
+                else:
+                    cfg["retry_count"] = 0
+                    cfg["next_run"] = self._next_run_ts(cfg.get("interval", "weekly"))
                 self.write_sync_config(cfg)
             except Exception:  # noqa: BLE001
                 pass
@@ -341,6 +357,11 @@ class App:
             with self.lock:
                 self.fetch_state = "ok"
             self._log(f"✅ 已缓存 {len(entry['courses'])} 条课程（用时 {time.time()-t0:.0f} 秒）")
+            try:
+                cnt = self.refresh_fixed()
+                self._log(f"固定下载链接已更新（{cnt} 个日程）")
+            except Exception as e:  # noqa: BLE001
+                self._log(f"⚠ 固定链接更新失败：{e}")
         except Exception as e:  # noqa: BLE001
             with self.lock:
                 self.fetch_state = "error"
@@ -353,6 +374,26 @@ class App:
     def out_dir(self):
         return _p(pipeline.DEFAULT_OUT_DIR)
 
+    def refresh_fixed(self):
+        """只刷新两份固定下载文件（不写时间戳存档），抓取后自动调用。"""
+        entry = self.cache()
+        if not entry:
+            return 0
+        st = self.current_settings()
+        courses = entry["courses"]
+        wm = pipeline.week_monday_of(entry, courses, st.semester_start)
+        if not wm:
+            return 0
+        semester = entry.get("semester", "unknown")
+        kw = dict(holidays=entry.get("holidays"))
+        count = 0
+        for fname, mg in ((pipeline.LATEST_MERGED, True),
+                          (pipeline.LATEST_FLAT, False)):
+            text, count = pipeline.build_ics(courses, wm, st, semester,
+                                             merge=mg, **kw)
+            pipeline.write_ics(text, os.path.join(self.out_dir(), fname))
+        return count
+
     def generate(self, skip_weekends=True, skip_before=None):
         entry = self.cache()
         if not entry:
@@ -363,12 +404,19 @@ class App:
         if not wm:
             raise RuntimeError("无法确定学期起始日期，请在左侧填写「第 1 周周一」")
         semester = entry.get("semester", "unknown")
-        text, n = pipeline.build_ics(
-            courses, wm, st, semester,
-            holidays=entry.get("holidays"),
-            skip_weekends=skip_weekends, skip_before=skip_before)
+        kw = dict(holidays=entry.get("holidays"),
+                  skip_weekends=skip_weekends, skip_before=skip_before)
+
+        # 存档：合并模式（文件名带时间）
+        text, n = pipeline.build_ics(courses, wm, st, semester, merge=True, **kw)
         out = pipeline.output_path(semester, self.out_dir())
         pipeline.write_ics(text, out)
+
+        # 固定下载链接：两种模式各一份，每次覆盖
+        for fname, mg in ((pipeline.LATEST_MERGED, True),
+                          (pipeline.LATEST_FLAT, False)):
+            t, _ = pipeline.build_ics(courses, wm, st, semester, merge=mg, **kw)
+            pipeline.write_ics(t, os.path.join(self.out_dir(), fname))
         with self.lock:
             self.last_generated = out
 
@@ -761,6 +809,17 @@ class Handler(BaseHTTPRequestHandler):
 
     def _download_ics(self, query=None):
         app = self.server.app
+        mode = ((query or {}).get("mode") or [None])[0]
+        if mode in ("merged", "flat"):
+            # 固定链接：始终返回最新生成的那一份
+            fname = (pipeline.LATEST_MERGED if mode == "merged"
+                     else pipeline.LATEST_FLAT)
+            fp = pipeline.export_path(app.out_dir(), fname)
+            if not fp:
+                return self._err("还没有生成 ics", 404)
+            return self._send_ics(
+                fp, "惠州城市职业学院_课表_合并.ics" if mode == "merged"
+                else "惠州城市职业学院_课表_逐天.ics")
         want = (query or {}).get("file", [None])[0]
         if want:
             fp = pipeline.export_path(app.out_dir(), want)
@@ -775,9 +834,12 @@ class Handler(BaseHTTPRequestHandler):
                 fp = pipeline.export_path(app.out_dir(), ex[0]["name"]) if ex else None
             if not fp or not os.path.exists(fp):
                 return self._err("还没有生成 ics", 404)
+        return self._send_ics(fp)
+
+    def _send_ics(self, fp, download_name=None):
         with open(fp, "rb") as f:
             data = f.read()
-        name = os.path.basename(fp)
+        name = download_name or os.path.basename(fp)
         from urllib.parse import quote
         self._send(200, data, "text/calendar; charset=utf-8",
                    {"Content-Disposition":

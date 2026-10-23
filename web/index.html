@@ -276,6 +276,26 @@ details[open] summary{margin-bottom:10px}
       <div id="remarkList"></div>
       <p class="hint">这些课在教务系统里只在「备注」行出现，没有固定星期/节次，因此不会生成日程。</p>
     </div>
+    <div class="card" id="linkCard">
+      <h2>固定下载链接 <span class="pill">每次生成自动更新</span></h2>
+      <p class="hint" style="margin:0 0 10px">订阅到手机/电脑日历，课表更新后自动同步，不用重新导入。</p>
+      <div class="field">
+        <label>合并版（同一门课一个重复日程，推荐）</label>
+        <div class="row">
+          <input type="text" id="linkMerged" readonly>
+          <button id="copyMerged" class="ghost">复制</button>
+          <a id="dlMerged" href="#" download><button class="primary">下载</button></a>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>逐天版（每次课一条，兼容性最好）</label>
+        <div class="row">
+          <input type="text" id="linkFlat" readonly>
+          <button id="copyFlat" class="ghost">复制</button>
+          <a id="dlFlat" href="#" download><button class="primary">下载</button></a>
+        </div>
+      </div>
+    </div>
     <div class="card" id="expCard">
       <h2>导出记录 <span class="pill" id="expCount"></span></h2>
       <div id="expList"></div>
@@ -588,6 +608,36 @@ function fmtSize(n){
   if (n == null) return "";
   return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
 }
+/* ---------- 固定下载链接 ---------- */
+let expExpanded = false;
+function initFixedLinks(){
+  const base = BASE || "";
+  const q = TOKEN ? ("?token=" + encodeURIComponent(TOKEN)) : "";
+  const mk = (mode) => `${location.origin}${base}/download/ics${q}${q ? "&" : "?"}mode=${mode}`;
+  const pairs = [["linkMerged", "dlMerged", "merged"],
+                 ["linkFlat", "dlFlat", "flat"]];
+  for (const [inp, dl, mode] of pairs){
+    const url = mk(mode);
+    const a = document.getElementById(inp);
+    if (a) a.value = url;
+    const b = document.getElementById(dl);
+    if (b) b.href = url;
+  }
+}
+async function copyFixed(id){
+  const el = document.getElementById(id);
+  if (!el) return;
+  const v = el.value;
+  try {
+    await navigator.clipboard.writeText(v);
+    toast("链接已复制");
+  } catch(e){
+    el.select();
+    try { document.execCommand("copy"); toast("链接已复制"); }
+    catch(_){ toast("复制失败，请手动选中", true); }
+  }
+}
+
 function renderExports(list){
   const box = $("#expList");
   if (!list || !list.length){
@@ -596,8 +646,10 @@ function renderExports(list){
     $("#expCount").textContent = "";
     return;
   }
+  const LIMIT = 5;
+  const show = expExpanded ? list : list.slice(0, LIMIT);
   $("#expCount").textContent = list.length + " 个";
-  box.innerHTML = list.map((f, i) => `
+  let html = show.map((f, i) => `
     <div class="exp">
       <div class="grow" style="flex:1; min-width:0">
         <div class="nm">${esc(f.name)}</div>
@@ -606,6 +658,16 @@ function renderExports(list){
       <a href="${BASE}/download/ics${QS ? QS + "&" : "?"}file=${encodeURIComponent(f.name)}">
         <button class="${i === 0 ? "primary" : ""}">下载</button></a>
     </div>`).join("");
+  if (list.length > LIMIT){
+    html += `<button class="ghost" id="expToggle" style="margin-top:8px;width:100%">
+      ${expExpanded ? "收起" : `展开全部（共 ${list.length} 个）`}</button>`;
+  }
+  box.innerHTML = html;
+  const tg = $("#expToggle");
+  if (tg) tg.addEventListener("click", () => {
+    expExpanded = !expExpanded;
+    renderExports(list);
+  });
 }
 async function refreshExports(){
   try { const s = await api("/api/state"); renderExports(s.exports); } catch(e){}
@@ -778,6 +840,8 @@ async function guestPoll(){
 setInterval(() => { if (GUEST) refreshGuestSync(); }, 30000);
 
 /* ---------- 交互 ---------- */
+on("#copyMerged", "click", () => copyFixed("linkMerged"));
+on("#copyFlat", "click", () => copyFixed("linkFlat"));
 on("#weekSel", "change", () => {
   state.week = +$("#weekSel").value; renderPreview();
 });
@@ -1009,6 +1073,7 @@ async function bootGuest(){
     applyConfig(s.config);
     applyArchiveCfg(s.archiveConfig);
     renderExports(s.exports);
+    initFixedLinks();
     $("#outDir").textContent = "输出目录：" + (s.outDir || "输出");
     renderAll(); renderWarn(s.warnings);
     loadArchive(); loadQQ();

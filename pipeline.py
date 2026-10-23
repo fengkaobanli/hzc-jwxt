@@ -176,8 +176,12 @@ def parse_holidays(seq):
 
 
 def build_ics(courses, week_monday, settings, semester, holidays=None,
-              skip_weekends=True, skip_before=None, cal_name=None):
-    """生成 ics 文本，返回 (text, count)"""
+              skip_weekends=True, skip_before=None, cal_name=None,
+              merge=True):
+    """生成 ics 文本，返回 (text, count)
+
+    merge=True 同一门课合并为 RRULE 系列；False 每天一条。
+    """
     if isinstance(skip_before, str):
         skip_before = datetime.strptime(skip_before, "%Y-%m-%d").date()
     hols = parse_holidays(holidays) if holidays is not None else list(DEFAULT_HOLIDAYS)
@@ -188,6 +192,7 @@ def build_ics(courses, week_monday, settings, semester, holidays=None,
         skip_weekends=skip_weekends,
         skip_before=skip_before,
         settings=settings,
+        merge=merge,
     )
 
 
@@ -216,14 +221,19 @@ def output_path(semester, out_dir=None, when=None, school=SCHOOL_NAME):
     return os.path.join(d, name)
 
 
+# 固定下载链接的文件名（每次生成覆盖，订阅链接永久有效）
+LATEST_MERGED = "_latest_merged.ics"
+LATEST_FLAT = "_latest_flat.ics"
+
+
 def list_exports(out_dir=None, limit=20):
-    """列出输出目录里已生成的 ics（新的在前）"""
+    """列出输出目录里已生成的 ics（新的在前，跳过固定链接文件）"""
     d = out_dir or DEFAULT_OUT_DIR
     if not os.path.isdir(d):
         return []
     items = []
     for n in sorted(os.listdir(d)):
-        if not n.lower().endswith(".ics"):
+        if not n.lower().endswith(".ics") or n.startswith("_latest_"):
             continue
         fp = os.path.join(d, n)
         try:
