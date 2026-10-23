@@ -63,14 +63,34 @@ check('第3-4节 = 10:00-11:35', st.block_time([3, 4]) == ('10:00', '11:35'),
 check('第5-6节 = 14:00-15:35', st.block_time([5, 6]) == ('14:00', '15:35'),
       str(st.block_time([5, 6])))
 
-ics, n = generate_ics(COURSES, WEEKS, settings=st)
-check('事件数 = 4', n == 4, f'n={n}')
+ics, n = generate_ics(COURSES, WEEKS, settings=st, merge=False)
+check('逐天模式事件数 = 4', n == 4, f'n={n}')
 s, e = event_time(ics, '电气工程CAD', 0)
 check('CAD 周一 3-4节 -> 10:00:00-11:35:00', (s, e) == ('100000', '113500'), f'{s}-{e}')
 s, e = event_time(ics, '中华优秀文化教育', 0)
 check('中华文化 周一 5-6节 -> 14:00:00-15:35:00', (s, e) == ('140000', '153500'), f'{s}-{e}')
 check('VALARM = -PT15M', 'TRIGGER:-PT15M' in ics)
 check('DESCRIPTION 含时间行', '时间: 08:00-09:35' in ics)
+
+# 1a) RRULE 合并模式
+print('\n[1a] RRULE 合并（139 条 -> 约 28 条）')
+ics_m, n_m = generate_ics(COURSES, WEEKS, settings=st, merge=True)
+check('合并后 3 条（电气 2 周并成 1 条）', n_m == 3, f'n={n_m}')
+check('含交替周 RRULE', 'RRULE:FREQ=WEEKLY;INTERVAL=1;COUNT=2' in ics_m)
+check('单周课不生成 RRULE', ics_m.count('RRULE:') == 1, str(ics_m.count('RRULE:')))
+check('默认即合并模式',
+      generate_ics(COURSES, WEEKS, settings=st)[1] == n_m)
+check('合并模式不产生 EXDATE（QQ 会丢弃）', 'EXDATE' not in ics_m)
+
+# 放假周应剔除并重新分段，而非用 EXDATE 表达
+_wm2 = dict(WEEKS)
+_ics_h, _n_h = generate_ics(
+    [{'name': '测试课', 'day': 1, 'sections': [1, 2], 'weeks': [1, 2]},
+     {'name': '测试课2', 'day': 1, 'sections': [3, 4], 'weeks': [1, 2]}],
+    _wm2, settings=st, holidays=[WEEKS[1]], merge=True)
+check('首周放假 -> DTSTART 顺延到第 2 周',
+      'DTSTART;TZID=Asia/Shanghai:' in _ics_h and 'EXDATE' not in _ics_h,
+      'no EXDATE')
 
 # 1b) 默认时间 = 惠州城市职业学院官方作息
 print('\n[1b] 默认时间模板（惠州城市职业学院）')
@@ -185,7 +205,8 @@ check('holidays 解析', len(pipeline.parse_holidays(['2026-09-25', '坏数据']
 print('\n[9] pipeline.build_ics')
 txt, cnt = pipeline.build_ics(COURSES, wm, Settings(), '2026-2027-1',
                               holidays=['2026-09-25'])
-check('事件数 4', cnt == 4, str(cnt))
+check('事件数 3（合并后）', cnt == 3, str(cnt))
+check('含 RRULE', 'RRULE:FREQ=WEEKLY' in txt)
 check('含 TZID', 'TZID=Asia/Shanghai' in txt)
 check('首行是 BEGIN:VCALENDAR', txt.startswith('BEGIN:VCALENDAR'))
 
