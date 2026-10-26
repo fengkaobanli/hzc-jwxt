@@ -6,6 +6,11 @@ services:
     restart: unless-stopped
     ports:
       - "8770:8770"
+    # 显式 DNS：容器默认转发宿主 resolv.conf，NAS 重启后曾出现
+    # "NO EXTERNAL NAMESERVERS DEFINED" 导致所有域名解析失败
+    dns:
+      - 192.168.1.9
+      - 223.5.5.5
     # 去掉 --base-path 则用根路径；对外暴露建议加 --token <口令>
     command: ["python", "/app/webapp.py", "--host", "0.0.0.0", "--port", "8770", "--base-path", "/class"]
     volumes:

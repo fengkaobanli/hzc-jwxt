@@ -119,9 +119,22 @@ def sync_ics(ics_path, server, username, password, cal_name,
     new_uids = {uid for uid, _ in events}
     ok = 0
     try:
-        for uid, ical in events:
-            cal.save_event(ical)
+        for idx, (uid, ical) in enumerate(events):
+            # 单条重试：QQ 偶发 connection reset，重试同 UID 是幂等的
+            for attempt in range(3):
+                try:
+                    cal.save_event(ical)
+                    break
+                except Exception as e:  # noqa: BLE001
+                    if attempt == 2:
+                        raise
+                    wait = 2 ** attempt
+                    log(f"第 {idx + 1}/{len(events)} 条写入失败，"
+                        f"{wait} 秒后重试：{str(e)[:80]}")
+                    _time.sleep(wait)
             ok += 1
+            if idx and idx % 8 == 0:
+                _time.sleep(0.4)      # 轻微节流，避免触发服务端频控
     except Exception as e:  # noqa: BLE001
         log(f"写入中断（已写 {ok}/{len(events)}）")
         if created:
