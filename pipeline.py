@@ -15,7 +15,7 @@ from hzc import connect, JWXT
 from calendar_xl import parse_calendar
 from parse_kb import (parse_courses, parse_remarks, parse_roster, diff_roster,
                       find_semester_info)
-from to_ics import generate_ics, DEFAULT_HOLIDAYS
+from to_ics import generate_ics, DEFAULT_HOLIDAYS, build_nexio
 
 XL_PAGE = JWXT + "/jsxsd/jxzl/jxzl_query"
 
@@ -224,6 +224,19 @@ def output_path(semester, out_dir=None, when=None, school=SCHOOL_NAME):
 # 固定下载链接的文件名（每次生成覆盖，订阅链接永久有效）
 LATEST_MERGED = "_latest_merged.ics"
 LATEST_FLAT = "_latest_flat.ics"
+LATEST_NEXIO = "_latest_nexio.json"
+
+
+def build_nexio_json(courses, week_monday, settings, semester, holidays=None,
+                     skip_weekends=True, skip_before=None):
+    """NexioSchedule 导入用 JSON（带 startSection/endSection，绕过时间匹配）。"""
+    if isinstance(skip_before, str):
+        skip_before = datetime.strptime(skip_before, "%Y-%m-%d").date()
+    hols = parse_holidays(holidays) if holidays is not None else list(DEFAULT_HOLIDAYS)
+    total = max(week_monday) if week_monday else 20
+    return build_nexio(courses, week_monday, holidays=hols, semester=semester,
+                       total_weeks=total, skip_weekends=skip_weekends,
+                       skip_before=skip_before)
 
 
 def list_exports(out_dir=None, limit=20):
@@ -259,7 +272,7 @@ def _semester_of(filename):
 def export_path(out_dir, name):
     """把下载请求里的文件名安全地映射到输出目录内的真实路径"""
     base = os.path.basename(name or "")
-    if not base.lower().endswith(".ics"):
+    if not base.lower().endswith((".ics", ".json")):
         return None
     fp = os.path.abspath(os.path.join(out_dir or DEFAULT_OUT_DIR, base))
     root = os.path.abspath(out_dir or DEFAULT_OUT_DIR)

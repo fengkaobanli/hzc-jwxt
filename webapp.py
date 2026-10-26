@@ -392,7 +392,21 @@ class App:
             text, count = pipeline.build_ics(courses, wm, st, semester,
                                              merge=mg, **kw)
             pipeline.write_ics(text, os.path.join(self.out_dir(), fname))
+        self._write_nexio(entry, st, wm, semester, **kw)
         return count
+
+    def _write_nexio(self, entry, st, wm, semester, **kw):
+        """NexioSchedule 的 JSON 导入文件（固定名，每次覆盖）。"""
+        data = pipeline.build_nexio_json(
+            entry["courses"], wm, st, semester,
+            holidays=kw.get("holidays"),
+            skip_weekends=kw.get("skip_weekends", True),
+            skip_before=kw.get("skip_before"))
+        path = os.path.join(self.out_dir(), pipeline.LATEST_NEXIO)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+        return path
 
     def generate(self, skip_weekends=True, skip_before=None):
         entry = self.cache()
@@ -417,6 +431,8 @@ class App:
                           (pipeline.LATEST_FLAT, False)):
             t, _ = pipeline.build_ics(courses, wm, st, semester, merge=mg, **kw)
             pipeline.write_ics(t, os.path.join(self.out_dir(), fname))
+
+        self._write_nexio(entry, st, wm, semester, **kw)
         with self.lock:
             self.last_generated = out
 
@@ -819,7 +835,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._err("还没有生成 ics", 404)
             return self._send_ics(
                 fp, "惠州城市职业学院_课表_合并.ics" if mode == "merged"
-                else "惠州城市职业学院_课表_逐天.ics")
+                else "惠州城市职业学院_课表_逐天.ics",
+                "hzc-class-merged.ics" if mode == "merged"
+                else "hzc-class-flat.ics")
+        if mode == "nexio":
+            fp = pipeline.export_path(app.out_dir(), pipeline.LATEST_NEXIO)
+            if not fp:
+                return self._err("还没有生成课表", 404)
+            return self._send_download(
+                fp, "application/json; charset=utf-8",
+                "惠州城市职业学院_课表_Nexio.json", "hzc-class-nexio.json")
         want = (query or {}).get("file", [None])[0]
         if want:
             fp = pipeline.export_path(app.out_dir(), want)
@@ -836,14 +861,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self._err("还没有生成 ics", 404)
         return self._send_ics(fp)
 
-    def _send_ics(self, fp, download_name=None):
+    def _send_ics(self, fp, download_name=None, ascii_name="hzc-class.ics"):
+        return self._send_download(fp, "text/calendar; charset=utf-8",
+                                   download_name, ascii_name)
+
+    def _send_download(self, fp, mime, download_name=None,
+                       ascii_name="download.bin"):
         with open(fp, "rb") as f:
             data = f.read()
         name = download_name or os.path.basename(fp)
         from urllib.parse import quote
-        self._send(200, data, "text/calendar; charset=utf-8",
-                   {"Content-Disposition":
-                    f"attachment; filename*=UTF-8''{quote(name)}"})
+        # filename= 给不认 RFC5987 的下载器兜底（Android/国产浏览器常见），
+        # 否则可能存成没有后缀的文件，App 的文件选择器直接看不到
+        disp = f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(name)}'
+        self._send(200, data, mime, {"Content-Disposition": disp})
         return None
 
 

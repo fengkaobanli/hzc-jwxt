@@ -287,12 +287,20 @@ details[open] summary{margin-bottom:10px}
           <a id="dlMerged" href="#" download><button class="primary">下载</button></a>
         </div>
       </div>
-      <div class="field" style="margin-bottom:0">
+      <div class="field">
         <label>逐天版（每次课一条，兼容性最好）</label>
         <div class="row">
           <input type="text" id="linkFlat" readonly>
           <button id="copyFlat" class="ghost">复制</button>
           <a id="dlFlat" href="#" download><button class="primary">下载</button></a>
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label>Nexio 课程表（JSON，导入时不用配节次时间）</label>
+        <div class="row">
+          <input type="text" id="linkNexio" readonly>
+          <button id="copyNexio" class="ghost">复制</button>
+          <a id="dlNexio" href="#" download><button class="primary">下载</button></a>
         </div>
       </div>
     </div>
@@ -615,7 +623,8 @@ function initFixedLinks(){
   const q = TOKEN ? ("?token=" + encodeURIComponent(TOKEN)) : "";
   const mk = (mode) => `${location.origin}${base}/download/ics${q}${q ? "&" : "?"}mode=${mode}`;
   const pairs = [["linkMerged", "dlMerged", "merged"],
-                 ["linkFlat", "dlFlat", "flat"]];
+                 ["linkFlat", "dlFlat", "flat"],
+                 ["linkNexio", "dlNexio", "nexio"]];
   for (const [inp, dl, mode] of pairs){
     const url = mk(mode);
     const a = document.getElementById(inp);
@@ -842,6 +851,7 @@ setInterval(() => { if (GUEST) refreshGuestSync(); }, 30000);
 /* ---------- 交互 ---------- */
 on("#copyMerged", "click", () => copyFixed("linkMerged"));
 on("#copyFlat", "click", () => copyFixed("linkFlat"));
+on("#copyNexio", "click", () => copyFixed("linkNexio"));
 on("#weekSel", "change", () => {
   state.week = +$("#weekSel").value; renderPreview();
 });

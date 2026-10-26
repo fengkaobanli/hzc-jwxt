@@ -136,6 +136,66 @@ def _uid_hash(key, seg_index):
     return hashlib.sha1(raw.encode('utf-8')).hexdigest()[:16]
 
 
+def build_nexio(courses, week_monday, holidays=None, semester="",
+                total_weeks=20, skip_weekends=True, skip_pairs=None,
+                skip_before=None):
+    """生成 NexioSchedule 的 JSON 导入格式。
+
+    与 ics 的区别：直接给 startSection/endSection，完全绕过该 App 的
+    "按节次时间反推节次"逻辑——那一步匹配失败会静默跳过整门课，
+    再触发 `require(courses.size == coursesData.size)` 导致整个导入失败。
+    """
+    holidays = set(holidays or [])
+    skip_pairs = set(skip_pairs or [])
+    groups = {}
+    for c in courses:
+        if skip_weekends and c['day'] >= 6:
+            continue
+        groups.setdefault(_group_key(c), []).append(c)
+
+    out = []
+    for key, items in groups.items():
+        name, day, sections = key[0], key[1], sorted(key[2])
+        weeks = sorted({w for c in items for w in c['weeks']})
+        weeks = [w for w in weeks if (name, w) not in skip_pairs]
+        weeks = [w for w in weeks
+                 if _week_usable(w, week_monday, day, holidays, skip_before)]
+        if not weeks:
+            continue
+        c0 = items[0]
+        # 节次不连续时拆成多条（App 的 startSection/endSection 只能表达连续区间）
+        for run in _contiguous(sections):
+            out.append({
+                "name": name,
+                "classroom": (c0.get("building", "") + c0.get("classroom", "")).strip(),
+                "teacher": c0.get("teacher", ""),
+                "dayOfWeek": day,
+                "startSection": run[0],
+                "endSection": run[-1],
+                "selectedWeeks": weeks,
+            })
+    return {
+        "schedule_name": f"惠州城市职业学院 {semester}".strip(),
+        "settings": {"total_weeks": int(total_weeks or 20)},
+        "courses": out,
+    }
+
+
+def _contiguous(ss):
+    """[1,2,4,5,6] -> [[1,2],[4,5,6]]"""
+    if not ss:
+        return []
+    runs, cur = [], [ss[0]]
+    for x in ss[1:]:
+        if x == cur[-1] + 1:
+            cur.append(x)
+        else:
+            runs.append(cur)
+            cur = [x]
+    runs.append(cur)
+    return runs
+
+
 def _ics_head(cal_name):
     return [
         'BEGIN:VCALENDAR',
