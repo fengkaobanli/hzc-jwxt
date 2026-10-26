@@ -163,6 +163,9 @@ def build_nexio(courses, week_monday, holidays=None, semester="",
         if not weeks:
             continue
         c0 = items[0]
+        # 第一次上课的绝对日期：App 会用它反推"第 1 周周一"
+        first_monday = week_monday[weeks[0]]
+        first_date = first_monday + timedelta(days=day - 1)
         # 节次不连续时拆成多条（App 的 startSection/endSection 只能表达连续区间）
         for run in _contiguous(sections):
             out.append({
@@ -173,10 +176,18 @@ def build_nexio(courses, week_monday, holidays=None, semester="",
                 "startSection": run[0],
                 "endSection": run[-1],
                 "selectedWeeks": weeks,
+                "startDate": f"{first_date:%Y%m%d}",
             })
+
+    # 学期锚点：缺了它 App 会用"今天往前 16 周"当第 1 周，导致整表周次错位
+    anchor = week_monday[min(week_monday)] if week_monday else None
+    settings = {"total_weeks": int(total_weeks or 20)}
+    if anchor:
+        settings["class_start_time"] = f"{anchor:%Y-%m-%d}"
+
     return {
         "schedule_name": f"惠州城市职业学院 {semester}".strip(),
-        "settings": {"total_weeks": int(total_weeks or 20)},
+        "settings": settings,
         "courses": out,
     }
 
